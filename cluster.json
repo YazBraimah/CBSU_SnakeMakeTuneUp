@@ -1,0 +1,74 @@
+{
+    "__default__": {
+        "q"         : "regular.q",
+        "output"    : "/home/ya76/SnakeMakeTuneUp/cluster_logs/default.log",
+        "jname"     : "sm.def",
+        "cores"		: 4,
+        "bl"		: 4,
+        "memory"    : 8,
+        "time"      : "6:00:00"
+    },
+    "tophat_pe": {
+    	"q"         : "regular.q",
+        "output"    : "/home/ya76/SnakeMakeTuneUp/cluster_logs/tophat_pe.log",
+        "jname"     : "sm.tophat",
+        "cores"		: 8,
+        "bl"		: 8,
+        "memory"    : 32,
+        "time"		: "12:00:00"
+    },
+    "tophat_se": {
+        "q"         : "regular.q",
+        "output"    : "/home/ya76/SnakeMakeTuneUp/cluster_logs/tophat_se.log",
+        "jname"     : "sm.tophat",
+        "cores"     : 8,
+        "bl"        : 8,
+        "memory"    : 32,
+        "time"      : "12:00:00"
+    },
+	"cufflinks": {
+	   "q"          : "regular.q",
+        "output"    : "/dev/null",
+        "jname"     : "sm.cflnks",
+        "cores"		: 8,
+        "bl"		: 8,
+        "memory"    : 32,
+        "time"		: "12:00:00"
+	},
+	"cuffmerge": {
+		"q"         : "regular.q",
+        "output"    : "/dev/null",
+        "jname"     : "sm.cffmrg",
+        "cores"		: 4,
+        "bl"		: 4,
+        "memory"    : 8,
+        "time"		: "2:00:00"
+	},
+	"make_cdna": {
+		"q"         : "regular.q",
+        "output"    : "/dev/null",
+        "jname"     : "sm.mkcdna",
+        "cores"		: 2,
+        "bl"		: 2,
+        "time"		: "2:00:00"
+	},
+	"express_pe": {
+		"q"         : "regular.q",
+        "output"    : "/dev/null",
+        "jname"     : "sm.STAR2",
+        "cores"		: 8,
+        "bl"		: 8,
+        "memory"    : 32,
+        "time"		: "24:00:00"
+	},
+    "express_se": {
+        "q"         : "regular.q",
+        "output"    : "/dev/null",
+        "jname"     : "sm.STAR2",
+        "cores"     : 8,
+        "bl"        : 8,
+        "memory"    : 32,
+        "time"      : "24:00:00"
+    }
+}
+
