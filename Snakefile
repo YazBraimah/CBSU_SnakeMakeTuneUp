@@ -68,8 +68,8 @@ rule all:
     input: 
       expand(join(OUT_DIR, 'Tophat', '{sample}',  'accepted_hits.bam'), sample = SAMPLES),
       # expand(join(OUT_DIR, 'Cufflinks', '{sample}', 'transcripts.gtf'), sample = SAMPLES),
-      # expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
-      # expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
+      expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
+      expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
       join(OUT_DIR, 'MultiQC', 'multiqc_report.html'),
       # join(OUT_DIR, 'Cuffmerge', 'merged.gtf'),
       # expand(join(OUT_DIR, 'Cuffquant', '{sample}',  'abundances.cxb'), sample = SAMPLES),
@@ -98,55 +98,62 @@ rule index:
         shell('bowtie2-build {input.dna} ' + join(dirname(DNA), rstrip(DNA, '.fa')) + ' > {log} 2>&1')
         shell('touch ' + join(dirname(DNA), rstrip(DNA, '.fa') + '.ok'))
 
+# Rule to check quality of trimmed reads
+rule fastqc_pe:
+    input:
+        r1 = lambda wildcards: peFILES[wildcards.sample]['R1'],
+        r2 = lambda wildcards: peFILES[wildcards.sample]['R2']
+    output:
+        r1 = join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'),
+        r2 = join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html')
+    log:
+        join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.log')
+    benchmark:
+        join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.benchmark.tsv')
+    message: 
+        """--- Checking trimmed read quality of sample "{wildcards.sample}" with FastQC """
+    run:
+        if not os.path.exists(join(OUT_DIR, 'fastQC')):
+            os.makedirs(join(OUT_DIR, 'fastQC'))
+
+        shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) +
+              ' && cp {input.r1} {input.r2} ' + join(WORK_DIR, USER, JOB_ID) +
+              ' && cd ' + join(WORK_DIR, USER, JOB_ID) + 
+                ' && fastqc ' +
+                os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r1}')) + ' ' + 
+                os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r2}')) +
+                ' > {log} 2>&1')
+        shell('cd ' + join(WORK_DIR, USER, JOB_ID) + ' && rm ' + os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r1}')) + ' ' +
+                os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r2}')))
+        shell('mv ' + join(WORK_DIR, USER, JOB_ID) + '/* ' + join(OUT_DIR, 'fastQC', '{wildcards.sample}'))
+        shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
+
+
 ## Rule to check quality of trimmed reads
-# rule fastqc_pe:
-#     input:
-#         r1 = lambda wildcards: peFILES[wildcards.sample]['R1'],
-#         r2 = lambda wildcards: peFILES[wildcards.sample]['R2']
-#     output:
-#         r1 = join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'),
-#         r2 = join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html')
-#     log:
-#         join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.log')
-#     benchmark:
-#         join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.benchmark.tsv')
-#     message: 
-#         """--- Checking trimmed read quality of sample "{wildcards.sample}" with FastQC """
-#     run:
-#         if not os.path.exists(join(OUT_DIR, 'fastQC')):
-#             os.makedirs(join(OUT_DIR, 'fastQC'))
+rule fastqc_se:
+    input:
+        r1 = lambda wildcards: seFILES[wildcards.sample]['R1']
+    output:
+        r1 = join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html')
+    log:
+        join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.log')
+    benchmark:
+        join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.benchmark.tsv')
+    message: 
+        """--- Checking trimmed read quality of sample "{wildcards.sample}" with FastQC """
+    run:
+        if not os.path.exists(join(OUT_DIR, 'fastQC')):
+            os.makedirs(join(OUT_DIR, 'fastQC'))
 
-#         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) +
-#               ' && cp {input.r1} {input.r2} ' + join(WORK_DIR, USER, JOB_ID) + 
-#               ' && cd ' + join(WORK_DIR, USER, JOB_ID) + 
-#                 ' && fastqc'
-#                 ' * > {log} 2>&1')
-#         shell('mv *html *zip fastQC_pe* ' + join(OUT_DIR, 'fastQC', '{wildcards.sample}'))
-#         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
-
-# ## Rule to check quality of trimmed reads
-# rule fastqc_se:
-#     input:
-#         r1 = lambda wildcards: seFILES[wildcards.sample]['R1']
-#     output:
-#         r1 = join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html')
-#     log:
-#         join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.log')
-#     benchmark:
-#         join(OUT_DIR, 'fastQC', '{sample}', 'fastQC_pe.benchmark.tsv')
-#     message: 
-#         """--- Checking trimmed read quality of sample "{wildcards.sample}" with FastQC """
-#     run:
-#         if not os.path.exists(join(OUT_DIR, 'fastQC')):
-#             os.makedirs(join(OUT_DIR, 'fastQC'))
-
-#         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) +
-#               ' && cp {input.r1} ' + join(WORK_DIR, USER, JOB_ID) +
-#               ' && cd ' + join(WORK_DIR, USER, JOB_ID) + 
-#                 ' && fastqc'
-#                 ' * > {log} 2>&1')
-#         shell('mv *html *zip fastQC_se* ' + join(OUT_DIR, 'fastQC', '{wildcards.sample}'))
-#         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
+        shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) +
+              ' && cp {input.r1} ' + join(WORK_DIR, USER, JOB_ID) +
+              ' && cd ' + join(WORK_DIR, USER, JOB_ID) + 
+                ' && fastqc ' +
+                os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r1}')) +
+                ' > {log} 2>&1')
+        shell('cd ' + join(WORK_DIR, USER, JOB_ID) + ' && rm ' + os.path.basename(join(WORK_DIR, USER, JOB_ID, '{input.r1}')))
+        shell('mv ' + join(WORK_DIR, USER, JOB_ID) + '/* ' + join(OUT_DIR, 'fastQC', '{wildcards.sample}'))
+        shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
 ## Rule for mapping reads to the genome with Tophat
 rule tophat_pe:
@@ -157,8 +164,8 @@ rule tophat_pe:
     output: 
         bam = join(OUT_DIR, 'Tophat', '{sample}', 'accepted_hits.bam')
     params: 
-        gtf = GTF,
-        r1 = os.path.basename('{input.r1}')
+        gtf = GTF#,
+        #r1 = os.path.basename()
     log:
         join(OUT_DIR, 'Tophat', '{sample}', 'tophat.map.log')
     benchmark:
@@ -215,8 +222,8 @@ rule tophat_se:
 rule multiQC:
     input:
         expand(join(OUT_DIR, 'Tophat', '{sample}', 'accepted_hits.bam'), sample = SAMPLES),
-        # expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
-        # expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
+        expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
+        expand(join(OUT_DIR, 'fastQC', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
        # expand(join(OUT_DIR, 'eXpress', '{sample}', 'results.xprs'), sample = SAMPLES)
 
     output:
@@ -229,7 +236,7 @@ rule multiQC:
         """--- Running MultiQC """
     run:
         shell('ls -1 ' + join(OUT_DIR) + '/Tophat/*/align_summary.txt > ' + join(OUT_DIR, 'summary_files.txt'))
-        # shell('ls -1 ' + join(OUT_DIR) + '/fastQC/*fastqc.zip >> ' + join(OUT_DIR, 'summary_files.txt'))
+        shell('ls -1 ' + join(OUT_DIR) + '/fastQC/*fastqc.zip >> ' + join(OUT_DIR, 'summary_files.txt'))
         # shell('ls -1 ' + join(OUT_DIR) + '/eXpress/*/eXpress.log >> ' + join(OUT_DIR, 'summary_files.txt'))
         shell('multiqc'
                 ' -f'
