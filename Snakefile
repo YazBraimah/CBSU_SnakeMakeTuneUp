@@ -45,15 +45,16 @@ USER = os.environ.get('USER')
 JOB_ID = os.environ.get('JOB_ID')
 WORK_DIR = "/workdir"
 
+HOME_DIR = config['HOME_DIR']
 # message("The current working directory is " + WORK_DIR)
 
 # Samples and their corresponding filenames.
 # paired-end:
-peFILES = json.load(open(config['PE_SAMPLES_JSON'])) # The "samples.json" file can be created with
-peSAMPLES = sorted(peFILES.keys())             # the "make_json_SE/PE_samples.py" script
+peFILES = json.load(open(config['PE_SAMPLES_JSON'])) 
+peSAMPLES = sorted(peFILES.keys())           
 # single-end
-seFILES = json.load(open(config['SE_SAMPLES_JSON'])) # The "samples.json" file can be created with
-seSAMPLES = sorted(seFILES.keys())                  # the "make_json_SE/PE_samples.py" script
+seFILES = json.load(open(config['SE_SAMPLES_JSON'])) 
+seSAMPLES = sorted(seFILES.keys())                  
 # read both
 #FILES = json.load(open(config['SAMPLES_JSON']))
 combinedSam = [peSAMPLES, seSAMPLES]
@@ -75,12 +76,13 @@ rule all:
       # expand(join(OUT_DIR, 'Cuffquant', '{sample}',  'abundances.cxb'), sample = SAMPLES),
       # join(OUT_DIR, 'Cuffnorm', 'expression_data', 'run.info'),
       expand(join(OUT_DIR, 'eXpress', '{sample}', 'results.xprs'), sample = SAMPLES),
-      # join(OUT_DIR, 'eXpress', 'genes.TMM.EXPR.matrix')
+      join(OUT_DIR, 'eXpress', 'isoform-level_abundances', 'isoforms.TMM.EXPR.matrix'),
+      join(OUT_DIR, 'eXpress', 'gene-level_abundances', 'genes.TMM.EXPR.matrix')
         
 
 
 
-## Rule to generate bowtie2 genome index file
+## Rule to generate bowtie2 genome index 
 rule index:
     input:
         dna = DNA
@@ -98,7 +100,9 @@ rule index:
         shell('bowtie2-build {input.dna} ' + join(dirname(DNA), rstrip(DNA, '.fa')) + ' > {log} 2>&1')
         shell('touch ' + join(dirname(DNA), rstrip(DNA, '.fa') + '.ok'))
 
-# Rule to check quality of trimmed reads
+
+
+# Rule to check PE read quality
 rule fastqc_pe:
     input:
         r1 = lambda wildcards: peFILES[wildcards.sample]['R1'],
@@ -126,7 +130,7 @@ rule fastqc_pe:
         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
 
-## Rule to check quality of trimmed reads
+## Rule to check SE read quality
 rule fastqc_se:
     input:
         r1 = lambda wildcards: seFILES[wildcards.sample]['R1']
@@ -151,7 +155,9 @@ rule fastqc_se:
         shell('mv ' + join(WORK_DIR, USER, JOB_ID) + '/* ' + join(OUT_DIR, 'fastQC', '{wildcards.sample}'))
         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
-## Rule for mapping reads to the genome with Tophat
+
+
+## Rule for mapping PE reads to the genome with Tophat
 rule tophat_pe:
     input:
         r1 = lambda wildcards: peFILES[wildcards.sample]['R1'],
@@ -166,7 +172,7 @@ rule tophat_pe:
     benchmark:
         join(OUT_DIR, 'Tophat', '{sample}', 'tophat.map.benchmark.tsv')
     message: 
-        """--- Mapping sample "{wildcards.sample}" with Tophat."""
+        """--- Mapping PE sample "{wildcards.sample}" with Tophat."""
     run: 
         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) + 
                 ' && cp {input.r1} {input.r2} ' + join(WORK_DIR, USER, JOB_ID) + 
@@ -183,7 +189,7 @@ rule tophat_pe:
 
 
 
-# Rule for mapping reads to the genome with Tophat
+# Rule for mapping SE reads to the genome with Tophat
 rule tophat_se:
     input:
         r1 = lambda wildcards: seFILES[wildcards.sample]['R1'],
@@ -197,7 +203,7 @@ rule tophat_se:
     benchmark:
         join(OUT_DIR, 'Tophat', '{sample}', 'tophat.map.benchmark.tsv')
     message: 
-        """--- Mapping sample "{wildcards.sample}" with Tophat."""
+        """--- Mapping SE sample "{wildcards.sample}" with Tophat."""
     run: 
         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) + 
                 ' && cp {input.r1} ' + join(WORK_DIR, USER, JOB_ID) + 
@@ -212,30 +218,7 @@ rule tophat_se:
         shell('mv ' + join(WORK_DIR, USER, JOB_ID, '{wildcards.sample}') + '/* ' + join(OUT_DIR, 'Tophat', '{wildcards.sample}'))
         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
-## Rule to collate fastQC outputs with multiQC
-rule multiQC:
-    input:
-        expand(join(OUT_DIR, 'Tophat', '{sample}', 'accepted_hits.bam'), sample = SAMPLES),
-        expand(join(OUT_DIR, 'fastQC', '{sample}', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
-        expand(join(OUT_DIR, 'fastQC', '{sample}', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
-        expand(join(OUT_DIR, 'eXpress', '{sample}', 'results.xprs'), sample = SAMPLES)
 
-    output:
-        file = join(OUT_DIR, 'MultiQC', 'multiqc_report.html')
-    log:
-        join(OUT_DIR, 'MultiQC', 'multiQC.log')
-    benchmark:
-        join(OUT_DIR, 'MultiQC', 'multiQC.benchmark.tsv')
-    message: 
-        """--- Running MultiQC """
-    run:
-        shell('ls -1 ' + join(OUT_DIR) + '/Tophat/*/align_summary.txt > ' + join(OUT_DIR, 'summary_files.txt'))
-        shell('ls -1 ' + join(OUT_DIR) + '/fastQC/*/*fastqc.zip >> ' + join(OUT_DIR, 'summary_files.txt'))
-        shell('ls -1 ' + join(OUT_DIR) + '/eXpress/*/eXpress.log >> ' + join(OUT_DIR, 'summary_files.txt'))
-        shell('multiqc'
-                ' -f'
-                ' -o ' + join(OUT_DIR, 'MultiQC') + ' -d -dd 2 -l ' + join(OUT_DIR, 'summary_files.txt') +
-                ' > {log} 2>&1')
 
 ## Rule for assembling rtansfrags with Cufflinks
 rule cufflinks:
@@ -280,12 +263,12 @@ rule cuffmerge:
     message: 
         "--- Comparing transcripts to the reference and outputting merged gtf file."
     run: 
+        
         # generate the assemblies text file
         shell('ls -1 ' + join(OUT_DIR) + '/Cufflinks/*/transcripts.gtf > ' + join(OUT_DIR, 'Cuffmerge', 'assemblies.txt'))
         ## an alternative way to create the "assemblies.txt" file:
         ## with open (output.txt, 'w') as out:
         ##  print(*input, sep="\n", file=out)
-
         # run cuffmerge
         shell('cuffmerge'
               ' -o ' + join(OUT_DIR, 'Cuffmerge') +
@@ -302,16 +285,16 @@ rule make_cdna:
         dna = DNA,
         gtf = rules.cuffmerge.output.merged
     output:
-        cdna = join(OUT_DIR, 'transcriptome', 'gffread_transcripts.fa'),
-        geneTrans = join(OUT_DIR, 'transcriptome', 'gffread_transcripts.gene_trans_map'),
-        bt2_trans_indx = join(OUT_DIR, 'transcriptome', 'gffread_transcripts.fa.bowtie2.ok')
+        cdna = join(HOME_DIR, 'transcriptome', 'gffread_transcripts.fa'),
+        geneTrans = join(HOME_DIR, 'transcriptome', 'gffread_transcripts.gene_trans_map'),
+        bt2_trans_indx = join(HOME_DIR, 'transcriptome', 'gffread_transcripts.fa.bowtie2.ok')
     log:
-        gffread = join(OUT_DIR, 'transcriptome', 'logs', 'gffread.log'),
-        trans_bt2 = join(OUT_DIR, 'transcriptome', 'logs', 'trans_bt2.log')
+        gffread = join(HOME_DIR, 'transcriptome', 'logs', 'gffread.log'),
+        trans_bt2 = join(HOME_DIR, 'transcriptome', 'logs', 'trans_bt2.log')
     benchmark:
-        join(OUT_DIR, 'transcriptome', 'logs', 'gffread.benchmark.tsv')
+        join(HOME_DIR, 'transcriptome', 'logs', 'gffread.benchmark.tsv')
     message: 
-        "--- Building bowtie2 transcriptome index for gffread transcripts."
+        "--- Building bowtie2 transcriptome and index for eXpress"
     run:
         # Extract a sequence for each transcript in the GTF file.
         shell('gffread -F -w {output.cdna} -g {input.dna} {input.gtf} > {log.gffread}')
@@ -325,11 +308,11 @@ rule make_cdna:
               ' --est_method eXpress'
               ' --aln_method bowtie2'
               ' --prep_reference'
-              ' --output_dir ' + join(OUT_DIR, 'transcriptome') +
+              ' --output_dir ' + join(HOME_DIR, 'transcriptome') +
               ' > {log.trans_bt2} 2>&1')
 
 
-# Rule for mapping reads to the new transcriptome file with bowtie2 and quantifying abundance with eXpress
+# Rule for mapping PE reads to the new transcriptome file with bowtie2 and quantifying abundance with eXpress
 rule express_pe:
     input:
         r1 = lambda wildcards: peFILES[wildcards.sample]['R1'],
@@ -343,7 +326,7 @@ rule express_pe:
     benchmark:
         join(OUT_DIR, 'eXpress', '{sample}', 'eXpress.benchmark.tsv')
     message: 
-        """--- Mapping "{wildcards.sample}" reads to transcriptome with bowtie2 and quantifying abundance with eXpress."""
+        """--- Mapping "{wildcards.sample}" PE reads to transcriptome with bowtie2 and quantifying abundance with eXpress."""
     run:
         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) + 
               ' && cp {input.r1} {input.r2} ' + join(WORK_DIR, USER, JOB_ID))  
@@ -362,7 +345,8 @@ rule express_pe:
         shell('mv ' + join(WORK_DIR, USER, JOB_ID, '{wildcards.sample}') + '/* ' + join(OUT_DIR, 'eXpress', '{wildcards.sample}'))
         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
-# Rule for mapping reads to the new transcriptome file with bowtie2 and quantifying abundance with eXpress
+
+# Rule for mapping SE reads to the new transcriptome file with bowtie2 and quantifying abundance with eXpress
 rule express_se:
     input:
         r1 = lambda wildcards: seFILES[wildcards.sample]['R1'],
@@ -375,7 +359,7 @@ rule express_se:
     benchmark:
         join(OUT_DIR, 'eXpress', '{sample}', 'eXpress.benchmark.tsv')
     message: 
-        """--- Mapping "{wildcards.sample}" reads to transcriptome with bowtie2 and quantifying abundance with eXpress."""
+        """--- Mapping "{wildcards.sample}" SE reads to transcriptome with bowtie2 and quantifying abundance with eXpress."""
     run:
         shell('mkdir -p ' + join(WORK_DIR, USER, JOB_ID) + 
               ' && cp {input.r1} ' + join(WORK_DIR, USER, JOB_ID)) 
@@ -393,12 +377,41 @@ rule express_se:
         shell('mv ' + join(WORK_DIR, USER, JOB_ID, '{wildcards.sample}') + '/* ' + join(OUT_DIR, 'eXpress', '{wildcards.sample}'))
         shell('rm -r ' + join(WORK_DIR, USER, JOB_ID))
 
+
+
+
+## Rule to collate fastQC, Tophat, and Bowtie2 outputs with multiQC
+rule multiQC:
+    input:
+        expand(join(OUT_DIR, 'Tophat', '{sample}', 'accepted_hits.bam'), sample = SAMPLES),
+        expand(join(OUT_DIR, 'fastQC', '{sample}', '{sample}' + '.R1_fastqc.html'), sample = SAMPLES),
+        expand(join(OUT_DIR, 'fastQC', '{sample}', '{sample}' + '.R2_fastqc.html'), sample = peSAMPLES),
+        expand(join(OUT_DIR, 'eXpress', '{sample}', 'results.xprs'), sample = SAMPLES)
+
+    output:
+        file = join(OUT_DIR, 'MultiQC', 'multiqc_report.html')
+    log:
+        join(OUT_DIR, 'MultiQC', 'multiQC.log')
+    benchmark:
+        join(OUT_DIR, 'MultiQC', 'multiQC.benchmark.tsv')
+    message: 
+        """--- Running MultiQC """
+    run:
+        shell('ls -1 ' + join(OUT_DIR) + '/Tophat/*/align_summary.txt > ' + join(OUT_DIR, 'summary_files.txt'))
+        shell('ls -1 ' + join(OUT_DIR) + '/fastQC/*/*fastqc.zip >> ' + join(OUT_DIR, 'summary_files.txt'))
+        shell('ls -1 ' + join(OUT_DIR) + '/eXpress/*/eXpress.log >> ' + join(OUT_DIR, 'summary_files.txt'))
+        shell('multiqc'
+                ' -f'
+                ' -o ' + join(OUT_DIR, 'MultiQC') + ' -d -dd 2 -l ' + join(OUT_DIR, 'summary_files.txt') +
+                ' > {log} 2>&1')
+
+## Rule to merge eXpress abundance estimates
 rule merge_abundance:
     input:
         quants = expand(join(OUT_DIR, 'eXpress', '{sample}', 'results.xprs'), sample = SAMPLES)
     output:
-        abundances = join(OUT_DIR, 'eXpress', 'genes.TMM.EXPR.matrix'),
-        samplesList = join(OUT_DIR, 'eXpress', 'genes.samples.list')
+        gene_abundances = join(OUT_DIR, 'eXpress', 'gene-level_abundances', 'genes.TMM.EXPR.matrix'),
+        isoform_abundances = join(OUT_DIR, 'eXpress', 'isoform-level_abundances', 'isoforms.TMM.EXPR.matrix')
     log:
         join(OUT_DIR, 'eXpress', 'abnd_merge.log')
     benchmark:
@@ -422,7 +435,8 @@ rule merge_abundance:
                 ' --out_prefix isoforms'
                 ' ' + join(OUT_DIR, 'eXpress', 'isoforms.samples.list') +
                 ' > {log} 2>&1')
-
+        shell('mv ' + join(OUT_DIR, 'eXpress', 'genes*') + ' ' + join(OUT_DIR, 'eXpress', 'gene-level_abundances'))
+        shell('mv ' + join(OUT_DIR, 'eXpress', 'isoforms*') + ' ' + join(OUT_DIR, 'eXpress', 'isoform-level_abundances'))
 
 # ## Rule for quantifying abundance with Cuffquant
 # rule cuffquant:

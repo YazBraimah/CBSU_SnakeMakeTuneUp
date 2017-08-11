@@ -6,7 +6,7 @@ GTF: '/home/ya76/SnakeMakeTuneUp/annotations/gtf/GRCm38.83.chr19.gtf'
 
 # Path to a folder where final files will be written.
 OUT_DIR: '/fs/cbsufsrv5/data1/ya76/sampleSnake/output'
-HOME_DIR: '/home/ya76/SnakeMakeTuneUp/output'
+HOME_DIR: '/home/ya76/SnakeMakeTuneUp/'
 
 # Path to a JSON file with samples and their corresponding FASTQ files.
 PE_SAMPLES_JSON: '/home/ya76/SnakeMakeTuneUp/samples_pe.json'
